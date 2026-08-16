@@ -2,10 +2,12 @@ import { Link } from "react-router-dom";
 import {
   getMetrics,
   getReviewQueue,
+  getStats,
   listJobs,
   listModels,
   resolveMediaUrl,
 } from "../api/client";
+import DonutChart from "../components/DonutChart";
 import {
   Badge,
   Button,
@@ -21,7 +23,7 @@ import {
 } from "../components/ui";
 import { useAsync } from "../lib/useAsync";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
-import { ms, pct, relativeTime, shortId } from "../lib/format";
+import { absoluteTime, ms, pct, relativeTime, shortId } from "../lib/format";
 
 export default function DashboardPage() {
   useDocumentTitle(
@@ -30,22 +32,20 @@ export default function DashboardPage() {
   );
 
   const { data, loading, error, refresh } = useAsync(async () => {
-    const [jobs, queue, metrics, models] = await Promise.all([
+    const [jobs, queue, metrics, models, stats] = await Promise.all([
       listJobs(),
       getReviewQueue(),
       getMetrics(),
       listModels(),
+      getStats(),
     ]);
-    return { jobs, queue, metrics, models };
+    return { jobs, queue, metrics, models, stats };
   }, []);
 
   if (error) {
     return (
       <div className="mx-auto max-w-6xl px-5 py-8">
-        <ErrorNote
-          message={`Backend unreachable — ${error}`}
-          onRetry={refresh}
-        />
+        <ErrorNote message={error} onRetry={refresh} />
       </div>
     );
   }
@@ -54,20 +54,19 @@ export default function DashboardPage() {
   const queue = data?.queue ?? [];
   const metrics = data?.metrics ?? [];
   const models = data?.models ?? [];
+  // All headline numbers come from the database via /api/v1/stats — never
+  // from transient frontend state — and retries are de-duplicated server-side.
+  const stats = data?.stats ?? null;
 
-  const completed = jobs.filter((j) => j.status === "completed");
   const totalRequests = metrics.reduce((a, m) => a + m.requests, 0);
-  const avgLatency = metrics.length
-    ? metrics.reduce((a, m) => a + m.avg_latency_ms * m.requests, 0) /
-      Math.max(1, totalRequests)
-    : 0;
   const avgConfidence = metrics.length
     ? metrics.reduce((a, m) => a + m.avg_confidence * m.requests, 0) /
       Math.max(1, totalRequests)
     : 0;
-  const autoRate = completed.length
-    ? completed.filter((j) => !j.review_required).length / completed.length
-    : 0;
+  const autoRate =
+    stats && stats.total_detections
+      ? stats.auto_accepted_detections / stats.total_detections
+      : 0;
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-5 py-8">
@@ -95,33 +94,58 @@ export default function DashboardPage() {
         ) : (
           <>
             <Stat
-              label="Inference runs"
-              value={jobs.length}
-              sub={`${models.filter((m) => m.enabled).length} model adapters registered`}
+              label="Images processed"
+              value={stats?.total_jobs ?? 0}
+              sub={`${stats?.completed_jobs ?? 0} completed · ${
+                stats?.failed_jobs ?? 0
+              } failed · ${stats?.running_jobs ?? 0} running`}
             />
             <Stat
               label="Auto-accept rate"
               value={pct(autoRate)}
               tone="success"
-              sub="Predictions cleared without a human"
+              sub={`${stats?.auto_accepted_detections ?? 0} of ${
+                stats?.total_detections ?? 0
+              } detections cleared without a human`}
             />
             <Stat
               label="Awaiting verification"
-              value={queue.length}
+              value={stats?.pending_review_detections ?? queue.length}
               tone={queue.length ? "warn" : "neutral"}
-              sub="Detections below the accept threshold"
+              sub={`${stats?.reviewed_detections ?? 0} already verified by a human`}
             />
             <Stat
-              label="Median inference"
-              value={ms(avgLatency)}
+              label="Average inference time"
+              value={ms(stats?.avg_inference_ms ?? null)}
               tone="primary"
-              sub={`Mean confidence ${pct(avgConfidence)}`}
+              sub={`Model execution only · mean confidence ${pct(avgConfidence)}`}
             />
           </>
         )}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+        <Card>
+          <CardTitle hint="Every completed detection across all uploaded images, retries counted once.">
+            Detected class distribution
+          </CardTitle>
+          {loading && <Skeleton className="h-44" />}
+          {!loading && (!stats || stats.total_detections === 0) && (
+            <EmptyState
+              title="No detections yet"
+              description="Run an image through the pipeline and the distribution of detected classes appears here."
+              action={
+                <Link to="/upload">
+                  <Button variant="primary">Run inference</Button>
+                </Link>
+              }
+            />
+          )}
+          {!loading && stats && stats.total_detections > 0 && (
+            <DonutChart slices={stats.distribution} total={stats.total_detections} />
+          )}
+        </Card>
+
         <Card>
           <CardTitle
             hint="Same image, same contract, independently comparable adapters."
@@ -238,7 +262,10 @@ export default function DashboardPage() {
                   </p>
                 </div>
                 {job.review_required && <Badge tone="warn">needs review</Badge>}
-                <span className="hidden text-[11px] text-subtle-foreground sm:block">
+                <span
+                  className="hidden text-[11px] text-subtle-foreground sm:block"
+                  title={absoluteTime(job.created_at)}
+                >
                   {relativeTime(job.created_at)}
                 </span>
               </Link>
