@@ -124,28 +124,28 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <Card>
-          <CardTitle hint="Every completed detection across all uploaded images, retries counted once.">
-            Detected class distribution
-          </CardTitle>
-          {loading && <Skeleton className="h-44" />}
-          {!loading && (!stats || stats.total_detections === 0) && (
-            <EmptyState
-              title="No detections yet"
-              description="Run an image through the pipeline and the distribution of detected classes appears here."
-              action={
-                <Link to="/upload">
-                  <Button variant="primary">Run inference</Button>
-                </Link>
-              }
-            />
-          )}
-          {!loading && stats && stats.total_detections > 0 && (
-            <DonutChart slices={stats.distribution} total={stats.total_detections} />
-          )}
-        </Card>
+        <CardTitle hint="Every completed detection across all uploaded images, retries counted once.">
+          Detected class distribution
+        </CardTitle>
+        {loading && <Skeleton className="h-44" />}
+        {!loading && (!stats || stats.total_detections === 0) && (
+          <EmptyState
+            title="No detections yet"
+            description="Run an image through the pipeline and the distribution of detected classes appears here."
+            action={
+              <Link to="/upload">
+                <Button variant="primary">Run inference</Button>
+              </Link>
+            }
+          />
+        )}
+        {!loading && stats && stats.total_detections > 0 && (
+          <DonutChart slices={stats.distribution} total={stats.total_detections} />
+        )}
+      </Card>
 
+      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <Card>
           <CardTitle
             hint="Same image, same contract, independently comparable adapters."
