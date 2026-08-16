@@ -23,7 +23,14 @@ import {
 } from "../components/ui";
 import { useAsync } from "../lib/useAsync";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
-import { absoluteTime, ms, pct, relativeTime, shortId } from "../lib/format";
+import {
+  absoluteTime,
+  modelLabel,
+  ms,
+  pct,
+  relativeTime,
+  shortId,
+} from "../lib/format";
 
 export default function DashboardPage() {
   useDocumentTitle(

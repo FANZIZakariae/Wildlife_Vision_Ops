@@ -9,7 +9,7 @@ import {
 } from "../components/ui";
 import { useAsync } from "../lib/useAsync";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
-import { ms, pct } from "../lib/format";
+import { modelLabel, ms, pct } from "../lib/format";
 
 function Layer({
   title,
