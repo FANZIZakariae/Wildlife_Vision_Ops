@@ -20,9 +20,13 @@ logger = logging.getLogger("wildlife_vision_ops.startup")
 async def lifespan(_app: FastAPI):
     # 1. Any job left mid-flight by a previous (crashed) worker is closed out
     #    so nothing stays "running" forever.
+    swept = 0
     db = SessionLocal()
     try:
         swept = jobs_repo.fail_stale_jobs(db)
+    except Exception:  # schema not migrated yet -> never block boot/health
+        logger.warning("stale_job_sweep_skipped", exc_info=True)
+        db.rollback()
     finally:
         db.close()
 
