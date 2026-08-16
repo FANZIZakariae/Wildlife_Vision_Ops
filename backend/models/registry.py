@@ -1,3 +1,4 @@
+import threading
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -21,6 +22,15 @@ _ADAPTER_BUILDERS = {
         conf_threshold=cfg["threshold"],
     ),
 }
+
+# Guards adapter construction so two concurrent first-requests can never load
+# two copies of the YOLO weights into memory.
+_adapter_lock = threading.Lock()
+
+# Only one CPU-heavy inference at a time per process. This is a demo running
+# on a small CPU-only instance: queueing briefly is far cheaper (and far more
+# stable) than running several YOLO passes in parallel and OOM-ing the box.
+inference_semaphore = threading.Semaphore(1)
 
 
 @dataclass(frozen=True)
@@ -57,8 +67,7 @@ def get_model_config(key: str) -> ModelConfig:
 
 
 @lru_cache
-def get_adapter(key: str) -> VisionModel:
-    """Adapters are cached per key so model weights load once per process."""
+def _build_adapter(key: str) -> VisionModel:
     cfg = get_model_config(key)
     builder = _ADAPTER_BUILDERS.get(cfg.adapter)
     if builder is None:
@@ -68,3 +77,15 @@ def get_adapter(key: str) -> VisionModel:
         "model": cfg.model,
         "threshold": cfg.threshold,
     })
+
+
+def get_adapter(key: str) -> VisionModel:
+    """Adapters are cached per key so model weights load once per process.
+
+    Validation happens outside the lock so unknown/disabled keys still raise
+    immediately, and construction happens under a lock so concurrent cold
+    starts share one instance.
+    """
+    get_model_config(key)  # raises KeyError/ValueError for bad keys
+    with _adapter_lock:
+        return _build_adapter(key)
