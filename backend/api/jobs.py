@@ -1,3 +1,4 @@
+import logging
 import uuid
 from pathlib import Path
 
@@ -11,6 +12,8 @@ from backend.domain.schemas import DetectionOut, JobOut, JobSummaryOut
 from backend.repositories import jobs as jobs_repo
 from backend.services import audit as audit_service
 from backend.services import inference as inference_service
+
+logger = logging.getLogger("wildlife_vision_ops.api.jobs")
 
 router = APIRouter(prefix="/api/v1/jobs", tags=["jobs"])
 
@@ -43,13 +46,19 @@ async def create_job(
     except (KeyError, ValueError) as exc:
         raise HTTPException(400, str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(500, f"Inference failed: {exc}") from exc
+        # Never surface a Python traceback to the client.
+        logger.exception("inference_request_failed", extra={"model": model})
+        raise HTTPException(
+            503, "Inference service unavailable. Please try again."
+        ) from exc
 
     return to_job_out(job)
 
 
 @router.get("", response_model=list[JobSummaryOut])
 def list_jobs(limit: int = 50, db: Session = Depends(get_db)):
+    # Close out anything orphaned by a crashed worker before reporting history.
+    jobs_repo.fail_stale_jobs(db)
     jobs = jobs_repo.list_jobs(db, limit=limit)
     return [to_job_summary_out(j) for j in jobs]
 

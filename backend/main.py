@@ -31,6 +31,7 @@ async def lifespan(_app: FastAPI):
     log_event(logger, "startup_completed", stale_jobs_failed=swept, warm_models=warmed)
     yield
 
+
 app = FastAPI(
     title="Wildlife Vision Ops",
     description="Model-agnostic computer vision inference and human-verification platform.",
