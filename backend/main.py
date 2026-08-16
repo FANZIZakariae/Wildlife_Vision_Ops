@@ -46,7 +46,10 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_credentials=True,
+    # This API does not use cookies or browser credentials. Keeping credential
+    # mode off allows a wildcard origin safely and, importantly, lets browsers
+    # complete the OPTIONS preflight required by DELETE requests from Vercel.
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

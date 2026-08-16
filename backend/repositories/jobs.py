@@ -82,6 +82,12 @@ def get_job(db: Session, job_id: str) -> InferenceJob | None:
     return db.execute(stmt).scalar_one_or_none()
 
 
+def delete_job(db: Session, job: InferenceJob) -> None:
+    """Delete a job and its related detections, reviews and audit events."""
+    db.delete(job)
+    db.commit()
+
+
 def list_jobs(db: Session, *, limit: int = 50) -> list[InferenceJob]:
     stmt = (
         select(InferenceJob)
