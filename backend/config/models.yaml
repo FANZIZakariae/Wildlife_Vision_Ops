@@ -3,6 +3,8 @@
 # adapter class; nothing else in the application changes.
 models:
   wildlife-detector-v1:
+    label: "YOLO11n (real model)"
+    description: "Ultralytics YOLO11n running on CPU at 416px — a real neural detector."
     provider: ultralytics
     adapter: yolo
     model: yolo11n.pt
@@ -16,6 +18,8 @@ models:
   # concrete proof that the application layer doesn't know or care what
   # produced a Prediction.
   wildlife-detector-v2:
+    label: "Placeholder CV (no real model)"
+    description: "A swappable stand-in: classical contour heuristics, no neural network. Shows any model can be dropped behind the same interface."
     provider: opencv
     adapter: stub_cv
     model: contour-heuristic
