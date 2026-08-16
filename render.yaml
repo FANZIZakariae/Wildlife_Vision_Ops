@@ -1,0 +1,17 @@
+# Render Blueprint for the backend API.
+# Import this repo in Render as a Blueprint, or create the web service
+# manually and point it at backend/Dockerfile -- either way, set the
+# envVars below (marked sync: false) in the Render dashboard.
+services:
+  - type: web
+    name: wildlife-vision-ops-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false

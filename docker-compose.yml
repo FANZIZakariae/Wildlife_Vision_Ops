@@ -1,0 +1,38 @@
+# Local dev/demo stack. Not used for the actual deployment (Render + Supabase
+# + Vercel) -- this is for running the whole thing with one command on any
+# machine that has Docker.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: wildlife
+      POSTGRES_PASSWORD: wildlife
+      POSTGRES_DB: wildlife_vision_ops
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wildlife"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg2://wildlife:wildlife@db:5432/wildlife_vision_ops
+      CORS_ORIGINS: '["http://localhost:5173","http://localhost:4173"]'
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - uploads:/app/backend/uploads
+
+volumes:
+  pgdata:
+  uploads:

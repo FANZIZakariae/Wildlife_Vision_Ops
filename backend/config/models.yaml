@@ -1,0 +1,24 @@
+# Model registry — the API selects an adapter by key. Adding a new model
+# (including a future partner model) means adding an entry here plus one
+# adapter class; nothing else in the application changes.
+models:
+  wildlife-detector-v1:
+    provider: ultralytics
+    adapter: yolo
+    model: yolo11n.pt
+    version: "1.0"
+    threshold: 0.40
+    enabled: true
+
+  # Stand-in for "swap in a partner model" — a completely different
+  # adapter class (classical CV, no YOLO/deep learning involved) behind
+  # the exact same VisionModel interface and API surface. This is the
+  # concrete proof that the application layer doesn't know or care what
+  # produced a Prediction.
+  wildlife-detector-v2:
+    provider: opencv
+    adapter: stub_cv
+    model: contour-heuristic
+    version: "0.1-stub"
+    threshold: 0.10
+    enabled: true

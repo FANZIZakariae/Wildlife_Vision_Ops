@@ -1,0 +1,13 @@
+target-version = "py311"
+line-length = 100
+
+[lint]
+select = ["E", "F", "B", "UP", "C4"]
+ignore = [
+  "B008", # FastAPI's Depends(...)/File(...)/Query(...) in defaults is idiomatic, not a bug
+  "UP042", # (str, Enum) is intentional here for broad compatibility, not just StrEnum
+]
+
+[lint.per-file-ignores]
+"backend/db/migrations/env.py" = ["E402"] # imports must follow the sys.path fixup above them
+"tests/conftest.py" = ["E402"] # same reason
