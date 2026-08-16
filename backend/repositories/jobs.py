@@ -3,6 +3,9 @@ from datetime import datetime, UTC
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from datetime import timedelta
+
+from backend.config.settings import settings
 from backend.db.models import Detection, InferenceJob
 
 
@@ -106,3 +109,32 @@ def recompute_review_required(db: Session, job: InferenceJob) -> InferenceJob:
     db.commit()
     db.refresh(job)
     return job
+
+
+def fail_stale_jobs(db: Session, *, timeout_s: int | None = None) -> int:
+    """Fail jobs stuck in pending/running past a generous CPU-inference budget.
+
+    CPU inference legitimately takes several seconds, so the timeout is far
+    above that; it only catches jobs orphaned by a crashed or restarted
+    worker, which would otherwise stay "running" forever.
+    """
+    limit = timeout_s if timeout_s is not None else settings.stale_job_timeout_s
+    cutoff = datetime.now(UTC) - timedelta(seconds=limit)
+    stmt = select(InferenceJob).where(InferenceJob.status.in_(("pending", "running")))
+    stale = []
+    for job in db.execute(stmt).scalars().all():
+        started = job.started_at or job.created_at
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=UTC)
+        if started < cutoff:
+            stale.append(job)
+
+    for job in stale:
+        job.status = "failed"
+        job.completed_at = datetime.now(UTC)
+        job.error_message = (
+            "Inference did not finish in time — the worker was interrupted or restarted."
+        )
+    if stale:
+        db.commit()
+    return len(stale)

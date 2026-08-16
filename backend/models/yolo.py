@@ -1,7 +1,9 @@
+import contextlib
 import logging
 import time
 import uuid
 
+import torch
 from ultralytics import YOLO
 
 from backend.domain.interfaces import VisionModel
@@ -32,14 +34,33 @@ class YOLOModel(VisionModel):
         self.model_version = model_version
         self.conf_threshold = conf_threshold
         try:
-            import torch
-
             # Cap intra-op threads: a small Render instance has very few cores
             # and oversubscribing them makes latency worse, not better.
             torch.set_num_threads(max(1, min(2, torch.get_num_threads())))
         except Exception:  # pragma: no cover - torch always present in practice
             pass
         self._yolo = YOLO(weights)
+        # Eval mode once, up front: nothing here ever trains.
+        with contextlib.suppress(Exception):
+            self._yolo.model.eval()
+
+    def warmup(self) -> None:
+        """Run one tiny pass so the first real request doesn't pay lazy-init cost.
+
+        Ultralytics defers a lot of work (fusing, warm buffers) to the first
+        predict call; doing it at boot keeps the first user request fast.
+        """
+        import numpy as np
+
+        blank = np.zeros((INFERENCE_IMGSZ, INFERENCE_IMGSZ, 3), dtype="uint8")
+        with torch.inference_mode():
+            self._yolo.predict(
+                source=blank,
+                imgsz=INFERENCE_IMGSZ,
+                device=INFERENCE_DEVICE,
+                verbose=False,
+                save=False,
+            )
 
     def predict(self, image_path: str) -> Prediction:
         log_event(
@@ -50,17 +71,18 @@ class YOLOModel(VisionModel):
             device=INFERENCE_DEVICE,
         )
         start = time.perf_counter()
-        results = self._yolo.predict(
-            source=image_path,
-            conf=self.conf_threshold,
-            imgsz=INFERENCE_IMGSZ,
-            device=INFERENCE_DEVICE,
-            augment=False,
-            save=False,
-            show=False,
-            stream=False,
-            verbose=False,
-        )
+        with torch.inference_mode():
+            results = self._yolo.predict(
+                source=image_path,
+                conf=self.conf_threshold,
+                imgsz=INFERENCE_IMGSZ,
+                device=INFERENCE_DEVICE,
+                augment=False,
+                save=False,
+                show=False,
+                stream=False,
+                verbose=False,
+            )
         latency_ms = (time.perf_counter() - start) * 1000
 
         result = results[0]

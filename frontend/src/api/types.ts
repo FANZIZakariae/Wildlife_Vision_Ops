@@ -84,7 +84,33 @@ export interface ReviewQueueItem {
   label: string;
   confidence: number;
   confidence_tier: ConfidenceTier;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
   image_url: string;
+  input_filename: string;
   model_name: string;
+  model_version: string;
   created_at: string;
+}
+
+export interface ClassSlice {
+  label: string;
+  count: number;
+  percentage: number;
+}
+
+/** Authoritative dashboard numbers, computed server-side from the database. */
+export interface Stats {
+  total_jobs: number;
+  completed_jobs: number;
+  failed_jobs: number;
+  running_jobs: number;
+  total_detections: number;
+  auto_accepted_detections: number;
+  reviewed_detections: number;
+  pending_review_detections: number;
+  avg_inference_ms: number | null;
+  distribution: ClassSlice[];
 }

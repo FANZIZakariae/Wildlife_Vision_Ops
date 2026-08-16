@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getReviewQueue } from "../api/client";
-import ReviewPanel from "../components/ReviewPanel";
+import ReviewPanel, { type ReviewGroup } from "../components/ReviewPanel";
 import {
   Button,
   Card,
@@ -32,6 +32,34 @@ export default function ReviewQueuePage() {
   }, [reviewer]);
 
   const queue = data ?? [];
+
+  // Detections are grouped per source image so the reviewer sees one image and
+  // all of its candidate detections together, instead of a flat list.
+  const groups: ReviewGroup[] = [];
+  const byJob = new Map<string, ReviewGroup>();
+  for (const item of queue) {
+    let group = byJob.get(item.job_id);
+    if (!group) {
+      group = {
+        jobId: item.job_id,
+        imageUrl: item.image_url,
+        inputFilename: item.input_filename,
+        modelName: item.model_name,
+        modelVersion: item.model_version,
+        createdAt: item.created_at,
+        items: [],
+      };
+      byJob.set(item.job_id, group);
+      groups.push(group);
+    }
+    group.items.push(item);
+  }
+  for (const group of groups) {
+    group.items.sort((a, b) => b.confidence - a.confidence);
+  }
+
+  // Correction options come from classes the models have actually produced.
+  const labelOptions = Array.from(new Set(queue.map((q) => q.label))).sort();
   const avgConfidence = queue.length
     ? queue.reduce((a, q) => a + q.confidence, 0) / queue.length
     : 0;
@@ -52,10 +80,10 @@ export default function ReviewQueuePage() {
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Stat
-          label="Pending items"
+          label="Pending detections"
           value={queue.length}
           tone={queue.length ? "warn" : "success"}
-          sub="Awaiting an expert decision"
+          sub={`Across ${groups.length} image${groups.length === 1 ? "" : "s"}`}
         />
         <Stat
           label="Mean confidence"
@@ -109,11 +137,12 @@ export default function ReviewQueuePage() {
       )}
 
       <div className="space-y-3">
-        {queue.map((item) => (
+        {groups.map((group) => (
           <ReviewPanel
-            key={item.detection_id}
-            item={item}
+            key={group.jobId}
+            group={group}
             reviewer={reviewer}
+            labelOptions={labelOptions}
             onDone={refresh}
           />
         ))}

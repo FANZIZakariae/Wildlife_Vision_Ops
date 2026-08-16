@@ -1,7 +1,7 @@
-from datetime import datetime
-from typing import Any
+from datetime import UTC, datetime
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
 from backend.domain.enums import (
     AuditEventType,
@@ -9,6 +9,21 @@ from backend.domain.enums import (
     JobStatus,
     ReviewDecision,
 )
+
+
+def _ensure_utc(value: datetime) -> datetime:
+    """Timestamps are persisted in UTC; naive DB values are tagged as UTC.
+
+    Guarantees every datetime leaving the API is timezone-aware ISO-8601, so
+    the browser can convert it to the local timezone without guessing.
+    """
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
+UtcDatetime = Annotated[datetime, AfterValidator(_ensure_utc)]
+
 
 
 class BoundingBox(BaseModel):
@@ -61,7 +76,7 @@ class ReviewOut(BaseModel):
     original_label: str | None = None
     corrected_label: str | None = None
     comment: str | None = None
-    created_at: datetime
+    created_at: UtcDatetime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -70,7 +85,7 @@ class AuditEventOut(BaseModel):
     id: str
     event_type: AuditEventType
     actor: str
-    timestamp: datetime
+    timestamp: UtcDatetime
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     model_config = ConfigDict(from_attributes=True)
@@ -86,9 +101,9 @@ class JobOut(BaseModel):
     latency_ms: float | None = None
     review_required: bool = False
     error_message: str | None = None
-    created_at: datetime
-    started_at: datetime | None = None
-    completed_at: datetime | None = None
+    created_at: UtcDatetime
+    started_at: UtcDatetime | None = None
+    completed_at: UtcDatetime | None = None
     detections: list[DetectionOut] = Field(default_factory=list)
     reviews: list[ReviewOut] = Field(default_factory=list)
 
@@ -105,7 +120,7 @@ class JobSummaryOut(BaseModel):
     latency_ms: float | None = None
     review_required: bool = False
     detection_count: int = 0
-    created_at: datetime
+    created_at: UtcDatetime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -133,3 +148,39 @@ class MetricsOut(BaseModel):
     avg_latency_ms: float
     review_rate: float
     avg_confidence: float
+
+
+class ReviewQueueItemOut(BaseModel):
+    job_id: str
+    detection_id: str
+    label: str
+    confidence: float
+    confidence_tier: ConfidenceTier
+    x1: float
+    y1: float
+    x2: float
+    y2: float
+    image_url: str
+    input_filename: str
+    model_name: str
+    model_version: str
+    created_at: UtcDatetime
+
+
+class ClassSliceOut(BaseModel):
+    label: str
+    count: int
+    percentage: float
+
+
+class StatsOut(BaseModel):
+    total_jobs: int
+    completed_jobs: int
+    failed_jobs: int
+    running_jobs: int
+    total_detections: int
+    auto_accepted_detections: int
+    reviewed_detections: int
+    pending_review_detections: int
+    avg_inference_ms: float | None = None
+    distribution: list[ClassSliceOut] = Field(default_factory=list)
