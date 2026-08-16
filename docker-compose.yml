@@ -23,7 +23,7 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     ports:
-      - "8000:8000"
+      - "8000:10000"
     environment:
       DATABASE_URL: postgresql+psycopg2://wildlife:wildlife@db:5432/wildlife_vision_ops
       CORS_ORIGINS: '["http://localhost:5173","http://localhost:4173"]'
