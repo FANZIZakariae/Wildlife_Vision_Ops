@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { listJobs, resolveMediaUrl } from "../api/client";
+import { deleteJob, listJobs, resolveMediaUrl } from "../api/client";
 import {
   Badge,
   Button,
@@ -13,7 +13,15 @@ import {
 } from "../components/ui";
 import { useAsync } from "../lib/useAsync";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
-import { absoluteTime, cx, ms, relativeTime, shortId } from "../lib/format";
+import { useToast } from "../components/Toast";
+import {
+  absoluteTime,
+  cx,
+  modelLabel,
+  ms,
+  relativeTime,
+  shortId,
+} from "../lib/format";
 import type { JobStatus } from "../api/types";
 
 const STATUS_TONE: Record<JobStatus, "success" | "warn" | "neutral" | "danger"> = {
@@ -35,6 +43,29 @@ export default function JobsPage() {
   const { data, loading, error, refresh } = useAsync(listJobs, []);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const toast = useToast();
+
+  // Deleting removes the image and every record derived from it, so it is
+  // confirmed first — there is no undo.
+  async function remove(id: string, filename: string) {
+    if (
+      !window.confirm(
+        `Delete "${filename}"? Its detections, reviews and audit trail are removed permanently.`
+      )
+    )
+      return;
+    setDeleting(id);
+    try {
+      await deleteJob(id);
+      toast.success("Image deleted", `${filename} and all of its data are gone.`);
+      refresh();
+    } catch (e) {
+      toast.error("Could not delete", (e as Error).message);
+    } finally {
+      setDeleting(null);
+    }
+  }
 
   const jobs = useMemo(() => {
     const list = data ?? [];
@@ -127,10 +158,10 @@ export default function JobsPage() {
         <Card padded={false}>
           <ul className="divide-y divide-border">
             {jobs.map((job) => (
-              <li key={job.id}>
+              <li key={job.id} className="flex items-center">
                 <Link
                   to={`/jobs/${job.id}`}
-                  className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-surface-elevated/60"
+                  className="flex min-w-0 flex-1 items-center gap-4 px-4 py-3 transition-colors hover:bg-surface-elevated/60"
                 >
                   <img
                     src={resolveMediaUrl(job.image_url)}
@@ -143,8 +174,9 @@ export default function JobsPage() {
                       {job.input_filename}
                     </p>
                     <p className="font-mono text-[11px] text-subtle-foreground">
-                      {shortId(job.id)} · {job.model_name} v{job.model_version} ·{" "}
-                      {job.detection_count} detections · {ms(job.latency_ms)}
+                      {shortId(job.id)} · {modelLabel(job.model_name)} v
+                      {job.model_version} · {job.detection_count} detections ·{" "}
+                      {ms(job.latency_ms)}
                     </p>
                   </div>
                   {job.review_required && <Badge tone="warn">needs review</Badge>}
@@ -156,7 +188,18 @@ export default function JobsPage() {
                     {relativeTime(job.created_at)}
                   </span>
                 </Link>
+                <button
+                  type="button"
+                  onClick={() => remove(job.id, job.input_filename)}
+                  disabled={deleting === job.id}
+                  title="Delete this image and all of its data"
+                  aria-label={`Delete ${job.input_filename}`}
+                  className="mr-3 rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-danger/60 hover:text-danger disabled:opacity-50"
+                >
+                  {deleting === job.id ? "Deleting…" : "Delete"}
+                </button>
               </li>
+
             ))}
           </ul>
         </Card>

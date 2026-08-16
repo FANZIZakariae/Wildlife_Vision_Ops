@@ -20,6 +20,8 @@ def list_models():
     return [
         ModelInfoOut(
             key=cfg.key,
+            label=cfg.label or cfg.key,
+            description=cfg.description,
             provider=cfg.provider,
             model=cfg.model,
             version=cfg.version,
@@ -28,6 +30,7 @@ def list_models():
         )
         for cfg in list_model_configs()
     ]
+
 
 
 @router.post("/compare", response_model=list[JobOut])

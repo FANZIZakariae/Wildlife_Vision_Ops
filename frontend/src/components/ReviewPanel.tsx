@@ -5,7 +5,7 @@ import type { Detection, ReviewDecision, ReviewQueueItem } from "../api/types";
 import BoundingBoxOverlay, { TIER_TONE, tierLabel } from "./BoundingBoxOverlay";
 import { Badge, Button, Card, Input, Meter } from "./ui";
 import { useToast } from "./Toast";
-import { absoluteTime, cx, pct, relativeTime, shortId } from "../lib/format";
+import { absoluteTime, cx, pct, relativeTime, shortId, modelLabel } from "../lib/format";
 
 /** All detections of one image that still need a human decision. */
 export interface ReviewGroup {
@@ -93,7 +93,7 @@ export default function ReviewPanel({
         <span className="truncate text-sm font-semibold">{group.inputFilename}</span>
         <Badge tone="warn">{group.items.length} to verify</Badge>
         <span className="font-mono text-[11px] text-subtle-foreground">
-          {group.modelName} · v{group.modelVersion}
+          {modelLabel(group.modelName)} · v{group.modelVersion}
         </span>
         <span
           className="ml-auto text-[11px] text-subtle-foreground"

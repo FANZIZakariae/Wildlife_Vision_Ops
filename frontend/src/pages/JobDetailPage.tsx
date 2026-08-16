@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { getAuditTrail, getJob } from "../api/client";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { deleteJob, getAuditTrail, getJob } from "../api/client";
 import AuditTimeline from "../components/AuditTimeline";
 import BoundingBoxOverlay, {
   TIER_TONE,
@@ -18,11 +18,15 @@ import {
 } from "../components/ui";
 import { useAsync } from "../lib/useAsync";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
-import { cx, ms, pct, shortId } from "../lib/format";
+import { useToast } from "../components/Toast";
+import { cx, modelLabel, ms, pct, shortId } from "../lib/format";
 
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [active, setActive] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const navigate = useNavigate();
+  const toast = useToast();
 
   const { data, loading, error, refresh } = useAsync(async () => {
     if (!id) throw new Error("Missing job id");
@@ -54,12 +58,31 @@ export default function JobDetailPage() {
 
   const { job, audit } = data;
 
+  // Permanent: the image file, its detections, reviews and audit trail all go.
+  async function remove() {
+    if (
+      !window.confirm(
+        `Delete "${job.input_filename}"? Its detections, reviews and audit trail are removed permanently.`
+      )
+    )
+      return;
+    setDeleting(true);
+    try {
+      await deleteJob(job.id);
+      toast.success("Image deleted", "The job and all of its data are gone.");
+      navigate("/jobs");
+    } catch (e) {
+      setDeleting(false);
+      toast.error("Could not delete", (e as Error).message);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-5 py-8">
       <PageHeader
         eyebrow={`Job ${shortId(job.id)}`}
         title={job.input_filename}
-        description={`${job.model_name} v${job.model_version} · ${ms(
+        description={`${modelLabel(job.model_name)} v${job.model_version} · ${ms(
           job.latency_ms
         )} · ${job.detections.length} detections`}
         action={
@@ -69,6 +92,15 @@ export default function JobDetailPage() {
             </Link>
             <Button variant="outline" onClick={refresh}>
               Refresh
+            </Button>
+            <Button
+              variant="outline"
+              onClick={remove}
+              loading={deleting}
+              className="border-danger/50 text-danger hover:bg-danger/10"
+              title="Delete this image and all of its data"
+            >
+              Delete image
             </Button>
           </div>
         }

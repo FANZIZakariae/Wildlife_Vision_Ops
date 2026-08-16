@@ -63,3 +63,21 @@ export function shortId(id: string): string {
 export function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(" ");
 }
+
+/**
+ * Human-facing model names.
+ *
+ * Jobs persist the registry key (e.g. "wildlife-detector-v1"), which tells a
+ * viewer nothing about what actually ran. This maps each key to what it really
+ * is, so the difference between the real detector and the swappable
+ * placeholder is obvious everywhere it is displayed.
+ */
+const MODEL_LABELS: Record<string, string> = {
+  "wildlife-detector-v1": "YOLO11n (real model)",
+  "wildlife-detector-v2": "Placeholder CV (no real model)",
+};
+
+export function modelLabel(key: string | null | undefined): string {
+  if (!key) return "Unknown model";
+  return MODEL_LABELS[key] ?? key;
+}

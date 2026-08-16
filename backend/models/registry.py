@@ -43,6 +43,11 @@ class ModelConfig:
     version: str
     threshold: float
     enabled: bool
+    # Human-facing naming so the UI can say what the adapter actually is,
+    # instead of exposing an internal registry key.
+    label: str = ""
+    description: str = ""
+
 
 
 @lru_cache

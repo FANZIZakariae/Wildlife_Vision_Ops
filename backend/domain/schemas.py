@@ -135,11 +135,14 @@ class ReviewRequest(BaseModel):
 
 class ModelInfoOut(BaseModel):
     key: str
+    label: str = ""
+    description: str = ""
     provider: str
     model: str
     version: str
     threshold: float
     enabled: bool
+
 
 
 class MetricsOut(BaseModel):
