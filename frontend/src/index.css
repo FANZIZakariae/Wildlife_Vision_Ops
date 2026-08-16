@@ -2,6 +2,135 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  @apply bg-slate-50 text-slate-900;
+@layer base {
+  :root {
+    /* Surfaces */
+    --background: 222 47% 6%;
+    --surface: 222 40% 9%;
+    --surface-elevated: 221 34% 13%;
+    --border: 220 20% 20%;
+    --border-strong: 220 18% 30%;
+
+    /* Text */
+    --foreground: 210 40% 96%;
+    --muted-foreground: 215 18% 62%;
+    --subtle-foreground: 215 16% 45%;
+
+    /* Brand */
+    --primary: 172 78% 44%;
+    --primary-foreground: 200 60% 6%;
+    --primary-soft: 172 60% 16%;
+
+    /* Signals */
+    --success: 152 58% 46%;
+    --warn: 38 92% 56%;
+    --danger: 0 72% 58%;
+
+    --ring: 172 78% 44%;
+    --radius: 0.65rem;
+
+    --shadow-panel: 0 1px 0 0 hsl(0 0% 100% / 0.03) inset,
+      0 18px 40px -24px hsl(222 60% 2% / 0.9);
+    --glow-primary: 0 0 0 1px hsl(var(--primary) / 0.35),
+      0 12px 32px -14px hsl(var(--primary) / 0.55);
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    background-image:
+      radial-gradient(60rem 40rem at 15% -10%, hsl(var(--primary) / 0.10), transparent 60%),
+      radial-gradient(50rem 34rem at 95% 0%, hsl(262 70% 50% / 0.10), transparent 55%);
+    background-attachment: fixed;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.015em;
+  }
+
+  code,
+  .font-mono {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.3);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border-strong));
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-xl border border-border bg-surface;
+    box-shadow: var(--shadow-panel);
+  }
+
+  .grid-lines {
+    background-image: linear-gradient(
+        to right,
+        hsl(var(--border) / 0.5) 1px,
+        transparent 1px
+      ),
+      linear-gradient(to bottom, hsl(var(--border) / 0.5) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+}
+
+@layer utilities {
+  .animate-in-up {
+    animation: in-up 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--surface-elevated)) 25%,
+      hsl(var(--border)) 37%,
+      hsl(var(--surface-elevated)) 63%
+    );
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease infinite;
+  }
+}
+
+@keyframes in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
 }
