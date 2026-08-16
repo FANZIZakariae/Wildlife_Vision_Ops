@@ -1,76 +1,170 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { compareModels, listModels, uploadJob } from "../api/client";
-import BoundingBoxOverlay from "../components/BoundingBoxOverlay";
+import BoundingBoxOverlay, {
+  TIER_TONE,
+  tierLabel,
+} from "../components/BoundingBoxOverlay";
+import {
+  Badge,
+  Button,
+  Card,
+  CardTitle,
+  Field,
+  PageHeader,
+  Skeleton,
+} from "../components/ui";
+import { useToast } from "../components/Toast";
+import { useDocumentTitle } from "../lib/useDocumentTitle";
+import { cx, ms, pct, shortId } from "../lib/format";
 import type { Job, ModelInfo } from "../api/types";
 
-function StatRow({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="flex justify-between border-b border-slate-100 py-1 text-sm last:border-0">
-      <span className="text-slate-500">{label}</span>
-      <span className="font-medium">{value}</span>
-    </div>
-  );
-}
-
 function JobResult({ job }: { job: Job }) {
+  const [active, setActive] = useState<string | null>(null);
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-[2fr_1fr]">
-      <BoundingBoxOverlay imageUrl={job.image_url} detections={job.detections} />
-      <div className="rounded border border-slate-200 bg-white p-4">
-        <StatRow label="Model" value={job.model_name} />
-        <StatRow label="Version" value={job.model_version} />
-        <StatRow label="Inference" value={`${Math.round(job.latency_ms ?? 0)} ms`} />
-        <StatRow label="Detections" value={job.detections.length} />
-        <StatRow
-          label="Review required"
-          value={job.review_required ? "Yes" : "No"}
-        />
-        <a
-          href={`/jobs/${job.id}`}
-          className="mt-3 inline-block text-sm text-blue-600 hover:underline"
-        >
-          View full job detail &amp; audit trail →
-        </a>
-      </div>
+    <div className="grid gap-4 md:grid-cols-[1.6fr_1fr]">
+      <BoundingBoxOverlay
+        imageUrl={job.image_url}
+        detections={job.detections}
+        activeId={active}
+        onHover={setActive}
+      />
+      <Card className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-subtle-foreground">
+              Latency
+            </p>
+            <p className="font-mono text-lg text-primary">{ms(job.latency_ms)}</p>
+          </div>
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-subtle-foreground">
+              Detections
+            </p>
+            <p className="font-mono text-lg">{job.detections.length}</p>
+          </div>
+        </div>
+
+        <div className="space-y-1 text-xs text-muted-foreground">
+          <p className="font-mono">
+            {job.model_name} · v{job.model_version}
+          </p>
+          <p className="font-mono">job {shortId(job.id)}</p>
+        </div>
+
+        <div className="space-y-2">
+          {job.detections.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              No objects passed the model's detection threshold.
+            </p>
+          )}
+          {job.detections.map((d) => (
+            <div
+              key={d.id}
+              onMouseEnter={() => setActive(d.id)}
+              onMouseLeave={() => setActive(null)}
+              className={cx(
+                "flex items-center justify-between rounded-lg border border-border px-2.5 py-1.5 text-xs transition-colors",
+                active === d.id ? "bg-surface-elevated" : "bg-transparent"
+              )}
+            >
+              <span className="capitalize">{d.label}</span>
+              <span className="flex items-center gap-2">
+                <span className="font-mono text-muted-foreground">
+                  {pct(d.confidence)}
+                </span>
+                <Badge tone={TIER_TONE[d.confidence_tier]}>
+                  {tierLabel(d.confidence_tier)}
+                </Badge>
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap gap-2 border-t border-border pt-3">
+          {job.review_required ? (
+            <Badge tone="warn">routed to human review</Badge>
+          ) : (
+            <Badge tone="success">auto-accepted</Badge>
+          )}
+          <Link
+            to={`/jobs/${job.id}`}
+            className="ml-auto text-xs text-primary hover:underline"
+          >
+            Full detail &amp; audit trail →
+          </Link>
+        </div>
+      </Card>
     </div>
   );
 }
 
 export default function UploadPage() {
+  useDocumentTitle(
+    "Run inference",
+    "Upload a camera-trap frame and run it through one model or compare every registered adapter side by side."
+  );
+
   const [models, setModels] = useState<ModelInfo[]>([]);
-  const [selectedModel, setSelectedModel] = useState<string>("");
+  const [selectedModel, setSelectedModel] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [compareJobs, setCompareJobs] = useState<Job[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<"single" | "compare" | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const toast = useToast();
 
   useEffect(() => {
-    listModels().then((ms) => {
-      setModels(ms);
-      if (ms.length > 0) setSelectedModel(ms[0].key);
-    });
+    listModels()
+      .then((ms_) => {
+        setModels(ms_);
+        if (ms_.length) setSelectedModel(ms_[0].key);
+      })
+      .catch((e: Error) => toast.error("Could not load model registry", e.message));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!file) return setPreview(null);
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  function accept(f: File | undefined | null) {
+    if (!f) return;
+    if (!/^image\/(png|jpeg|webp)$/.test(f.type)) {
+      toast.error("Unsupported file", "Use a PNG, JPEG or WebP image.");
+      return;
+    }
+    setFile(f);
+    setJob(null);
+    setCompareJobs(null);
+  }
 
   async function handleUpload() {
     if (!file || !selectedModel) return;
-    setLoading(true);
-    setError(null);
+    setBusy("single");
     setCompareJobs(null);
     try {
       const result = await uploadJob(file, selectedModel);
       setJob(result);
+      toast.success(
+        "Inference completed",
+        `${result.detections.length} detections in ${ms(result.latency_ms)}.`
+      );
     } catch (e) {
-      setError((e as Error).message);
+      toast.error("Inference failed", (e as Error).message);
     } finally {
-      setLoading(false);
+      setBusy(null);
     }
   }
 
   async function handleCompare() {
     if (!file || models.length < 2) return;
-    setLoading(true);
-    setError(null);
+    setBusy("compare");
     setJob(null);
     try {
       const results = await compareModels(
@@ -78,74 +172,136 @@ export default function UploadPage() {
         models.map((m) => m.key)
       );
       setCompareJobs(results);
+      toast.success("Comparison ready", `${results.length} adapters executed.`);
     } catch (e) {
-      setError((e as Error).message);
+      toast.error("Comparison failed", (e as Error).message);
     } finally {
-      setLoading(false);
+      setBusy(null);
     }
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 px-6 py-8">
-      <section className="rounded border border-slate-200 bg-white p-6">
-        <h2 className="mb-1 text-base font-semibold">Upload an image</h2>
-        <p className="mb-4 text-sm text-slate-500">
-          Prototype — CPU inference. Detections below auto-accept threshold are
-          routed to the human review queue instead of being shown as final.
-        </p>
-        <div className="flex flex-wrap items-center gap-3">
+    <div className="mx-auto max-w-6xl space-y-6 px-5 py-8">
+      <PageHeader
+        eyebrow="Inference"
+        title="Run a frame through the pipeline"
+        description="Detections above the accept threshold are final; anything below is routed to the human verification queue instead of being presented as truth."
+      />
+
+      <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
+        <Card>
+          <CardTitle hint="PNG, JPEG or WebP · CPU inference">Input frame</CardTitle>
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragging(false);
+              accept(e.dataTransfer.files?.[0]);
+            }}
+            onClick={() => inputRef.current?.click()}
+            className={cx(
+              "grid-lines flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-8 text-center transition-colors",
+              dragging
+                ? "border-primary bg-primary/5"
+                : "border-border hover:border-border-strong"
+            )}
+          >
+            {preview ? (
+              <img
+                src={preview}
+                alt="Selected frame preview"
+                className="max-h-56 rounded-lg border border-border"
+              />
+            ) : (
+              <>
+                <span className="text-2xl text-primary">⬆</span>
+                <p className="text-sm font-medium">Drop an image, or click to browse</p>
+                <p className="text-xs text-muted-foreground">
+                  Camera-trap frames work best
+                </p>
+              </>
+            )}
+            {file && (
+              <p className="font-mono text-[11px] text-subtle-foreground">
+                {file.name} · {(file.size / 1024).toFixed(0)} KB
+              </p>
+            )}
+          </div>
           <input
+            ref={inputRef}
             type="file"
             accept="image/png,image/jpeg,image/webp"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            className="text-sm"
+            className="hidden"
+            onChange={(e) => accept(e.target.files?.[0])}
           />
-          <select
-            value={selectedModel}
-            onChange={(e) => setSelectedModel(e.target.value)}
-            className="rounded border border-slate-300 px-2 py-1 text-sm"
-          >
-            {models.map((m) => (
-              <option key={m.key} value={m.key}>
-                {m.key} (v{m.version})
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={handleUpload}
-            disabled={!file || loading}
-            className="rounded bg-slate-900 px-4 py-1.5 text-sm text-white disabled:opacity-50"
-          >
-            {loading ? "Running inference…" : "Run inference"}
-          </button>
-          <button
-            onClick={handleCompare}
-            disabled={!file || loading || models.length < 2}
-            className="rounded border border-slate-300 px-4 py-1.5 text-sm disabled:opacity-50"
-            title="Run the same image through every registered model"
-          >
-            Compare all models
-          </button>
-        </div>
-        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
-      </section>
+        </Card>
 
-      {job && (
-        <section>
-          <h2 className="mb-2 text-base font-semibold">Result</h2>
+        <Card className="space-y-4">
+          <CardTitle hint="Swap the adapter — the platform stays identical.">
+            Execution
+          </CardTitle>
+          <Field label="Model adapter">
+            <select
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              className="rounded-lg border border-border bg-surface-elevated px-3 py-2 text-sm text-foreground focus:border-primary/60 focus:outline-none"
+            >
+              {models.map((m) => (
+                <option key={m.key} value={m.key}>
+                  {m.key} — v{m.version} (threshold {m.threshold})
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="primary"
+              onClick={handleUpload}
+              loading={busy === "single"}
+              disabled={!file || busy !== null}
+            >
+              Run inference
+            </Button>
+            <Button
+              onClick={handleCompare}
+              loading={busy === "compare"}
+              disabled={!file || busy !== null || models.length < 2}
+              title="Run the same image through every registered model"
+            >
+              Compare all models
+            </Button>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Comparison executes the identical image against every adapter, so
+            results are directly — and auditably — comparable.
+          </p>
+        </Card>
+      </div>
+
+      {busy && <Skeleton className="h-56" />}
+
+      {job && !busy && (
+        <section className="animate-in-up space-y-3">
+          <h2 className="text-sm font-semibold">Result</h2>
           <JobResult job={job} />
         </section>
       )}
 
-      {compareJobs && (
-        <section>
-          <h2 className="mb-2 text-base font-semibold">
-            Model comparison — same image, swappable adapter
+      {compareJobs && !busy && (
+        <section className="animate-in-up space-y-3">
+          <h2 className="text-sm font-semibold">
+            Model comparison — same frame, swappable adapter
           </h2>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="grid gap-5 xl:grid-cols-2">
             {compareJobs.map((j) => (
               <div key={j.id} className="space-y-2">
-                <p className="text-sm font-medium">{j.model_name}</p>
+                <p className="font-mono text-xs text-primary">{j.model_name}</p>
                 <JobResult job={j} />
               </div>
             ))}
