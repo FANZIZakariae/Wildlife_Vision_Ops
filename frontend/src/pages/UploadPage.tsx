@@ -10,9 +10,10 @@ import {
   Button,
   Card,
   CardTitle,
+  ErrorNote,
   Field,
   PageHeader,
-  Skeleton,
+  Spinner,
 } from "../components/ui";
 import { useToast } from "../components/Toast";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
@@ -99,6 +100,57 @@ function JobResult({ job }: { job: Job }) {
   );
 }
 
+type Phase = "idle" | "uploading" | "queued" | "running" | "completed" | "failed";
+
+const PHASE_STEPS: { key: Phase; label: string }[] = [
+  { key: "uploading", label: "Uploading image" },
+  { key: "queued", label: "Queued" },
+  { key: "running", label: "Running inference" },
+  { key: "completed", label: "Completed" },
+];
+
+function PhaseTracker({ phase }: { phase: Phase }) {
+  const order = PHASE_STEPS.map((s) => s.key);
+  const current = order.indexOf(phase);
+  return (
+    <Card>
+      <CardTitle hint="CPU inference typically takes a few seconds.">
+        Job status
+      </CardTitle>
+      <ol className="space-y-2">
+        {PHASE_STEPS.map((step, i) => {
+          const done = current > i || phase === "completed";
+          const activeStep = current === i && phase !== "completed";
+          return (
+            <li key={step.key} className="flex items-center gap-2 text-sm">
+              <span
+                className={cx(
+                  "flex h-5 w-5 items-center justify-center rounded-full border text-[10px]",
+                  done
+                    ? "border-success bg-success/15 text-success"
+                    : activeStep
+                      ? "border-primary bg-primary/15 text-primary"
+                      : "border-border text-subtle-foreground"
+                )}
+              >
+                {done ? "✓" : i + 1}
+              </span>
+              <span
+                className={cx(
+                  done || activeStep ? "text-foreground" : "text-subtle-foreground"
+                )}
+              >
+                {step.label}
+              </span>
+              {activeStep && <Spinner className="h-3.5 w-3.5 text-primary" />}
+            </li>
+          );
+        })}
+      </ol>
+    </Card>
+  );
+}
+
 export default function UploadPage() {
   useDocumentTitle(
     "Run inference",
@@ -112,6 +164,9 @@ export default function UploadPage() {
   const [job, setJob] = useState<Job | null>(null);
   const [compareJobs, setCompareJobs] = useState<Job[] | null>(null);
   const [busy, setBusy] = useState<"single" | "compare" | null>(null);
+  // Explicit lifecycle so the user is never staring at an unexplained spinner.
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [failure, setFailure] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
@@ -148,16 +203,25 @@ export default function UploadPage() {
     if (!file || !selectedModel) return;
     setBusy("single");
     setCompareJobs(null);
+    setFailure(null);
+    setPhase("uploading");
+    const queued = setTimeout(() => setPhase("queued"), 400);
+    const running = setTimeout(() => setPhase("running"), 1200);
     try {
       const result = await uploadJob(file, selectedModel);
       setJob(result);
+      setPhase("completed");
       toast.success(
         "Inference completed",
         `${result.detections.length} detections in ${ms(result.latency_ms)}.`
       );
     } catch (e) {
+      setPhase("failed");
+      setFailure((e as Error).message);
       toast.error("Inference failed", (e as Error).message);
     } finally {
+      clearTimeout(queued);
+      clearTimeout(running);
       setBusy(null);
     }
   }
@@ -166,14 +230,19 @@ export default function UploadPage() {
     if (!file || models.length < 2) return;
     setBusy("compare");
     setJob(null);
+    setFailure(null);
+    setPhase("running");
     try {
       const results = await compareModels(
         file,
         models.map((m) => m.key)
       );
       setCompareJobs(results);
+      setPhase("completed");
       toast.success("Comparison ready", `${results.length} adapters executed.`);
     } catch (e) {
+      setPhase("failed");
+      setFailure((e as Error).message);
       toast.error("Comparison failed", (e as Error).message);
     } finally {
       setBusy(null);
@@ -284,7 +353,16 @@ export default function UploadPage() {
         </Card>
       </div>
 
-      {busy && <Skeleton className="h-56" />}
+      {(busy || phase === "completed" || phase === "failed") && (
+        <PhaseTracker phase={phase} />
+      )}
+
+      {phase === "failed" && failure && (
+        <ErrorNote
+          message={failure}
+          onRetry={busy === "compare" ? handleCompare : handleUpload}
+        />
+      )}
 
       {job && !busy && (
         <section className="animate-in-up space-y-3">
