@@ -3,6 +3,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from backend.domain.enums import AuditEventType
+from backend.domain.schemas import _ensure_utc
 from backend.repositories import audit as audit_repo
 
 SYSTEM_ACTOR = "system"
@@ -32,7 +33,8 @@ def timeline(db: Session, job_id: str) -> list[dict]:
             "id": e.id,
             "event_type": e.event_type,
             "actor": e.actor,
-            "timestamp": e.timestamp,
+            # Always timezone-aware ISO-8601 so the browser can localise it.
+            "timestamp": _ensure_utc(e.timestamp).isoformat(),
             "metadata": e.event_metadata,
         }
         for e in events
