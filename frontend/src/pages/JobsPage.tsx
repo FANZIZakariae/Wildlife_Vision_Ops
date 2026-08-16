@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { listJobs, resolveMediaUrl } from "../api/client";
+import { deleteJob, listJobs, resolveMediaUrl } from "../api/client";
 import {
   Badge,
   Button,
@@ -13,7 +13,15 @@ import {
 } from "../components/ui";
 import { useAsync } from "../lib/useAsync";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
-import { absoluteTime, cx, ms, relativeTime, shortId } from "../lib/format";
+import { useToast } from "../components/Toast";
+import {
+  absoluteTime,
+  cx,
+  modelLabel,
+  ms,
+  relativeTime,
+  shortId,
+} from "../lib/format";
 import type { JobStatus } from "../api/types";
 
 const STATUS_TONE: Record<JobStatus, "success" | "warn" | "neutral" | "danger"> = {
@@ -35,6 +43,29 @@ export default function JobsPage() {
   const { data, loading, error, refresh } = useAsync(listJobs, []);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const toast = useToast();
+
+  // Deleting removes the image and every record derived from it, so it is
+  // confirmed first — there is no undo.
+  async function remove(id: string, filename: string) {
+    if (
+      !window.confirm(
+        `Delete "${filename}"? Its detections, reviews and audit trail are removed permanently.`
+      )
+    )
+      return;
+    setDeleting(id);
+    try {
+      await deleteJob(id);
+      toast.success("Image deleted", `${filename} and all of its data are gone.`);
+      refresh();
+    } catch (e) {
+      toast.error("Could not delete", (e as Error).message);
+    } finally {
+      setDeleting(null);
+    }
+  }
 
   const jobs = useMemo(() => {
     const list = data ?? [];
