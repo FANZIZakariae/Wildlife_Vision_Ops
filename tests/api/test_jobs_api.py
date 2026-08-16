@@ -71,6 +71,33 @@ def test_get_job_not_found(client):
     assert res.status_code == 404
 
 
+def test_delete_job_accepts_cross_origin_preflight_and_removes_all_data(client):
+    origin = "https://wildlife-vision-ops.vercel.app"
+    preflight = client.options(
+        "/api/v1/jobs/example",
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "DELETE",
+        },
+    )
+    assert preflight.status_code == 200
+    assert preflight.headers["access-control-allow-origin"] in ("*", origin)
+    assert "DELETE" in preflight.headers["access-control-allow-methods"]
+
+    with open(SAMPLE_IMAGE, "rb") as f:
+        job = client.post(
+            "/api/v1/jobs?model=wildlife-detector-v2",
+            files={"file": ("delete-me.jpg", f, "image/jpeg")},
+        ).json()
+
+    deleted = client.delete(
+        f"/api/v1/jobs/{job['id']}", headers={"Origin": origin}
+    )
+    assert deleted.status_code == 204
+    assert deleted.headers["access-control-allow-origin"] in ("*", origin)
+    assert client.get(f"/api/v1/jobs/{job['id']}").status_code == 404
+
+
 def test_review_queue_and_submit_review(client):
     with open(SAMPLE_IMAGE, "rb") as f:
         job = client.post(
