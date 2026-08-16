@@ -1,3 +1,4 @@
+import { parseTimestamp, UNKNOWN_TIME, absoluteTime } from "../lib/format";
 import type { AuditEvent } from "../api/types";
 
 const EVENT_LABELS: Record<string, string> = {
@@ -23,7 +24,10 @@ const EVENT_COLOR: Record<string, string> = {
 };
 
 function formatTime(ts: string): string {
-  return new Date(ts).toLocaleTimeString([], {
+  // UTC from the API -> the browser's own timezone, with a safe fallback.
+  const date = parseTimestamp(ts);
+  if (!date) return UNKNOWN_TIME;
+  return date.toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",

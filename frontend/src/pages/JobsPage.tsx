@@ -13,7 +13,7 @@ import {
 } from "../components/ui";
 import { useAsync } from "../lib/useAsync";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
-import { cx, ms, relativeTime, shortId } from "../lib/format";
+import { absoluteTime, cx, ms, relativeTime, shortId } from "../lib/format";
 import type { JobStatus } from "../api/types";
 
 const STATUS_TONE: Record<JobStatus, "success" | "warn" | "neutral" | "danger"> = {
@@ -149,7 +149,10 @@ export default function JobsPage() {
                   </div>
                   {job.review_required && <Badge tone="warn">needs review</Badge>}
                   <Badge tone={STATUS_TONE[job.status]}>{job.status}</Badge>
-                  <span className="hidden w-20 text-right text-[11px] text-subtle-foreground sm:block">
+                  <span
+                    className="hidden w-20 text-right text-[11px] text-subtle-foreground sm:block"
+                    title={absoluteTime(job.created_at)}
+                  >
                     {relativeTime(job.created_at)}
                   </span>
                 </Link>
