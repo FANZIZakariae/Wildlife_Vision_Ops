@@ -33,7 +33,7 @@ async def create_job(
     dest.write_bytes(contents)
 
     try:
-        job = inference_service.run_inference(
+        job = await inference_service.run_inference(
             db,
             image_path=dest,
             original_filename=file.filename or stored_filename,
