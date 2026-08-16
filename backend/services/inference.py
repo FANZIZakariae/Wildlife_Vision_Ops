@@ -2,11 +2,12 @@ import hashlib
 import logging
 from pathlib import Path
 
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from backend.domain.enums import AuditEventType
 from backend.logging_config import log_event
-from backend.models.registry import get_adapter, get_model_config
+from backend.models.registry import get_adapter, get_model_config, inference_semaphore
 from backend.repositories import jobs as jobs_repo
 from backend.services import audit as audit_service
 
@@ -21,7 +22,18 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def run_inference(
+def _predict_blocking(model_key: str, image_path: Path):
+    """Pure CPU work: no DB session crosses into this thread.
+
+    Serialized process-wide by a semaphore so only one heavy inference runs
+    at a time on a small CPU-only instance.
+    """
+    adapter = get_adapter(model_key)
+    with inference_semaphore:
+        return adapter.predict(str(image_path))
+
+
+async def run_inference(
     db: Session,
     *,
     image_path: Path,
@@ -51,8 +63,7 @@ def run_inference(
     audit_service.log(db, job_id=job.id, event_type=AuditEventType.INFERENCE_STARTED)
 
     try:
-        adapter = get_adapter(model_key)
-        prediction = adapter.predict(str(image_path))
+        prediction = await run_in_threadpool(_predict_blocking, model_key, image_path)
     except Exception as exc:
         jobs_repo.mark_failed(db, job, error_message=str(exc))
         audit_service.log(

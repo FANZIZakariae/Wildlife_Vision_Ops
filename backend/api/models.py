@@ -53,7 +53,7 @@ async def compare_models(
         dest = settings.upload_dir / stored_filename
         dest.write_bytes(contents)
         try:
-            job = inference_service.run_inference(
+            job = await inference_service.run_inference(
                 db,
                 image_path=dest,
                 original_filename=file.filename or stored_filename,
