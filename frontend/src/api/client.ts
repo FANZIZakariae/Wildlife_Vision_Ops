@@ -112,8 +112,13 @@ export async function deleteJob(id: string): Promise<void> {
     // Some reverse proxies reject DELETE's OPTIONS preflight. A bodyless POST
     // is a simple CORS request and reaches the equivalent backend action.
     if (error instanceof TypeError) {
-      await sendDeleteRequest(`/api/v1/jobs/${id}/delete`, "POST");
-      return;
+      try {
+        await sendDeleteRequest(`/api/v1/jobs/${id}/delete`, "POST");
+        return;
+      } catch (fallbackError) {
+        if (fallbackError instanceof TypeError) throw new Error(UNREACHABLE);
+        throw fallbackError;
+      }
     }
     throw error;
   }
