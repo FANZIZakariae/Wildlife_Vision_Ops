@@ -77,10 +77,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Blank Project" },
-      { name: "description", content: "" },
-      { property: "og:title", content: "Blank Project" },
-      { property: "og:description", content: "" },
+      { title: "Wildlife Vision Ops" },
+      {
+        name: "description",
+        content: "Computer vision inference with human verification and audit trail.",
+      },
+      { property: "og:title", content: "Wildlife Vision Ops" },
+      {
+        property: "og:description",
+        content: "Computer vision inference with human verification and audit trail.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
