@@ -62,6 +62,8 @@ async function friendlyError(res: Response): Promise<string> {
   }
   if (detail && !detail.includes("Traceback")) return detail;
   if (res.status === 404) return "That resource no longer exists.";
+  if (res.status === 405)
+    return "This action isn't available on the deployed backend yet — redeploy the API and try again.";
   if (res.status === 413) return "That image is too large. Try a smaller file.";
   if (res.status >= 500) return "Inference service unavailable. Please try again.";
   return `Request failed (${res.status}).`;
