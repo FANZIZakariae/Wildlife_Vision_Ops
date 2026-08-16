@@ -1,0 +1,11 @@
+# CPU-only PyTorch build. Installed FIRST in the Docker image from the
+# PyTorch CPU wheel index so that pip never resolves the default (CUDA)
+# torch build and its ~2.5GB nvidia-* / triton dependency tree.
+#
+#   pip install --index-url https://download.pytorch.org/whl/cpu -r backend/requirements-cpu.txt
+#
+# Once these are present, `pip install -r backend/requirements.txt` sees the
+# torch requirement of ultralytics as already satisfied and installs no
+# NVIDIA CUDA packages.
+torch==2.5.1
+torchvision==0.20.1
