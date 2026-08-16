@@ -71,6 +71,27 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
     return to_job_out(job)
 
 
+@router.delete("/{job_id}", status_code=204)
+def delete_job(job_id: str, db: Session = Depends(get_db)):
+    """Delete an image and every record derived from it.
+
+    Removes the job, its detections, reviews and audit events, plus the
+    uploaded file on disk — so a discarded image stops affecting metrics.
+    """
+    job = jobs_repo.get_job(db, job_id)
+    if job is None:
+        raise HTTPException(404, f"Job {job_id} not found")
+
+    stored = settings.upload_dir / job.stored_filename
+    jobs_repo.delete_job(db, job)
+    try:
+        stored.unlink(missing_ok=True)
+    except OSError:  # pragma: no cover - disk issue must not fail the delete
+        logger.warning("upload_file_delete_failed", extra={"file": str(stored)})
+    logger.info("job_deleted", extra={"job_id": job_id})
+    return None
+
+
 @router.get("/{job_id}/detections", response_model=list[DetectionOut])
 def get_detections(job_id: str, db: Session = Depends(get_db)):
     job = jobs_repo.get_job(db, job_id)
