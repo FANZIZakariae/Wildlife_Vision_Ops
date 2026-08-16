@@ -169,7 +169,7 @@ export default function DashboardPage() {
             {metrics.map((m) => (
               <div key={m.model_name} className="space-y-2">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="text-sm font-medium">{m.model_name}</span>
+                  <span className="text-sm font-medium">{modelLabel(m.model_name)}</span>
                   <span className="font-mono text-xs text-muted-foreground">
                     {m.requests} runs · {ms(m.avg_latency_ms)} · review{" "}
                     {pct(m.review_rate)}
@@ -258,7 +258,7 @@ export default function DashboardPage() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{job.input_filename}</p>
                   <p className="font-mono text-[11px] text-subtle-foreground">
-                    {shortId(job.id)} · {job.model_name} · {job.detection_count}{" "}
+                    {shortId(job.id)} · {modelLabel(job.model_name)} · {job.detection_count}{" "}
                     detections · {ms(job.latency_ms)}
                   </p>
                 </div>

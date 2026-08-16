@@ -151,7 +151,7 @@ export default function ArchitecturePage() {
               {metrics.map((m) => (
                 <div key={m.model_name} className="space-y-1.5">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="text-sm font-medium">{m.model_name}</span>
+                    <span className="text-sm font-medium">{modelLabel(m.model_name)}</span>
                     <Badge tone={m.review_rate > 0.5 ? "warn" : "success"}>
                       review {pct(m.review_rate)}
                     </Badge>

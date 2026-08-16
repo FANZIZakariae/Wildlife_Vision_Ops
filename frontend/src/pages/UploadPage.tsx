@@ -17,7 +17,7 @@ import {
 } from "../components/ui";
 import { useToast } from "../components/Toast";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
-import { cx, ms, pct, shortId } from "../lib/format";
+import { cx, modelLabel, ms, pct, shortId } from "../lib/format";
 import type { Job, ModelInfo } from "../api/types";
 
 function JobResult({ job }: { job: Job }) {
@@ -48,7 +48,7 @@ function JobResult({ job }: { job: Job }) {
 
         <div className="space-y-1 text-xs text-muted-foreground">
           <p className="font-mono">
-            {job.model_name} · v{job.model_version}
+            {modelLabel(job.model_name)} · v{job.model_version}
           </p>
           <p className="font-mono">job {shortId(job.id)}</p>
         </div>
@@ -321,11 +321,18 @@ export default function UploadPage() {
             >
               {models.map((m) => (
                 <option key={m.key} value={m.key}>
-                  {m.key} — v{m.version} (threshold {m.threshold})
+                  {m.label || m.key} — v{m.version} (threshold {m.threshold})
                 </option>
               ))}
             </select>
           </Field>
+
+          {(() => {
+            const chosen = models.find((m) => m.key === selectedModel);
+            return chosen?.description ? (
+              <p className="text-xs text-muted-foreground">{chosen.description}</p>
+            ) : null;
+          })()}
 
           <div className="flex flex-wrap gap-2">
             <Button
@@ -379,7 +386,9 @@ export default function UploadPage() {
           <div className="grid gap-5 xl:grid-cols-2">
             {compareJobs.map((j) => (
               <div key={j.id} className="space-y-2">
-                <p className="font-mono text-xs text-primary">{j.model_name}</p>
+                <p className="text-xs font-medium text-primary">
+                  {modelLabel(j.model_name)}
+                </p>
                 <JobResult job={j} />
               </div>
             ))}
