@@ -127,10 +127,10 @@ export default function JobsPage() {
         <Card padded={false}>
           <ul className="divide-y divide-border">
             {jobs.map((job) => (
-              <li key={job.id}>
+              <li key={job.id} className="flex items-center">
                 <Link
                   to={`/jobs/${job.id}`}
-                  className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-surface-elevated/60"
+                  className="flex min-w-0 flex-1 items-center gap-4 px-4 py-3 transition-colors hover:bg-surface-elevated/60"
                 >
                   <img
                     src={resolveMediaUrl(job.image_url)}
@@ -143,8 +143,9 @@ export default function JobsPage() {
                       {job.input_filename}
                     </p>
                     <p className="font-mono text-[11px] text-subtle-foreground">
-                      {shortId(job.id)} · {job.model_name} v{job.model_version} ·{" "}
-                      {job.detection_count} detections · {ms(job.latency_ms)}
+                      {shortId(job.id)} · {modelLabel(job.model_name)} v
+                      {job.model_version} · {job.detection_count} detections ·{" "}
+                      {ms(job.latency_ms)}
                     </p>
                   </div>
                   {job.review_required && <Badge tone="warn">needs review</Badge>}
@@ -156,7 +157,18 @@ export default function JobsPage() {
                     {relativeTime(job.created_at)}
                   </span>
                 </Link>
+                <button
+                  type="button"
+                  onClick={() => remove(job.id, job.input_filename)}
+                  disabled={deleting === job.id}
+                  title="Delete this image and all of its data"
+                  aria-label={`Delete ${job.input_filename}`}
+                  className="mr-3 rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-danger/60 hover:text-danger disabled:opacity-50"
+                >
+                  {deleting === job.id ? "Deleting…" : "Delete"}
+                </button>
               </li>
+
             ))}
           </ul>
         </Card>
