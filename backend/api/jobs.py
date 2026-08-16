@@ -12,6 +12,7 @@ from backend.domain.schemas import DetectionOut, JobOut, JobSummaryOut
 from backend.repositories import jobs as jobs_repo
 from backend.services import audit as audit_service
 from backend.services import inference as inference_service
+from backend.services import jobs as jobs_service
 
 logger = logging.getLogger("wildlife_vision_ops.api.jobs")
 
@@ -71,8 +72,7 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
     return to_job_out(job)
 
 
-@router.delete("/{job_id}", status_code=204)
-def delete_job(job_id: str, db: Session = Depends(get_db)):
+def _delete_job(job_id: str, db: Session) -> None:
     """Delete an image and every record derived from it.
 
     Removes the job, its detections, reviews and audit events, plus the
@@ -82,13 +82,19 @@ def delete_job(job_id: str, db: Session = Depends(get_db)):
     if job is None:
         raise HTTPException(404, f"Job {job_id} not found")
 
-    stored = settings.upload_dir / job.stored_filename
-    jobs_repo.delete_job(db, job)
-    try:
-        stored.unlink(missing_ok=True)
-    except OSError:  # pragma: no cover - disk issue must not fail the delete
-        logger.warning("upload_file_delete_failed", extra={"file": str(stored)})
-    logger.info("job_deleted", extra={"job_id": job_id})
+    jobs_service.delete_job_and_upload(db, job, settings.upload_dir)
+
+
+@router.delete("/{job_id}", status_code=204)
+def delete_job(job_id: str, db: Session = Depends(get_db)):
+    _delete_job(job_id, db)
+    return None
+
+
+@router.post("/{job_id}/delete", status_code=204)
+def delete_job_without_preflight(job_id: str, db: Session = Depends(get_db)):
+    """Equivalent POST action for hosts that block DELETE CORS preflights."""
+    _delete_job(job_id, db)
     return None
 
 

@@ -1,5 +1,8 @@
 import pytest
+from sqlalchemy import func, select
 
+from backend.config.settings import settings
+from backend.db.models import AuditEvent, Detection, InferenceJob, Review
 from tests.conftest import SAMPLE_IMAGE
 
 STANDARD_JOB_KEYS = {
@@ -71,7 +74,13 @@ def test_get_job_not_found(client):
     assert res.status_code == 404
 
 
-def test_delete_job_accepts_cross_origin_preflight_and_removes_all_data(client):
+@pytest.mark.parametrize(
+    ("method", "path_suffix"),
+    [("delete", ""), ("post", "/delete")],
+)
+def test_delete_job_accepts_cross_origin_and_removes_all_data(
+    client, db_session, method, path_suffix
+):
     origin = "https://wildlife-vision-ops.vercel.app"
     preflight = client.options(
         "/api/v1/jobs/example",
@@ -90,12 +99,23 @@ def test_delete_job_accepts_cross_origin_preflight_and_removes_all_data(client):
             files={"file": ("delete-me.jpg", f, "image/jpeg")},
         ).json()
 
-    deleted = client.delete(
-        f"/api/v1/jobs/{job['id']}", headers={"Origin": origin}
+    stored_file = settings.upload_dir / job["image_url"].rsplit("/", 1)[-1]
+    assert stored_file.exists()
+
+    deleted = getattr(client, method)(
+        f"/api/v1/jobs/{job['id']}{path_suffix}", headers={"Origin": origin}
     )
     assert deleted.status_code == 204
     assert deleted.headers["access-control-allow-origin"] in ("*", origin)
     assert client.get(f"/api/v1/jobs/{job['id']}").status_code == 404
+    assert not stored_file.exists()
+    for model in (InferenceJob, Detection, Review, AuditEvent):
+        assert db_session.scalar(select(func.count()).select_from(model)) == 0
+
+
+def test_delete_missing_job_is_404_for_both_routes(client):
+    assert client.delete("/api/v1/jobs/missing").status_code == 404
+    assert client.post("/api/v1/jobs/missing/delete").status_code == 404
 
 
 def test_review_queue_and_submit_review(client):

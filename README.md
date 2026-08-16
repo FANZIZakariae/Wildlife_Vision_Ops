@@ -123,6 +123,7 @@ minutes before a live demo so the first click doesn't hang.
 
 `GET /health` · `GET /metrics` · `GET /api/v1/models` ·
 `POST /api/v1/jobs` · `GET /api/v1/jobs` · `GET /api/v1/jobs/{id}` ·
+`DELETE /api/v1/jobs/{id}` · `POST /api/v1/jobs/{id}/delete` (CORS fallback) ·
 `GET /api/v1/jobs/{id}/detections` · `GET /api/v1/jobs/{id}/audit` ·
 `GET /api/v1/review-queue` · `POST /api/v1/jobs/{id}/review` ·
 `POST /api/v1/models/compare`
