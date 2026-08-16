@@ -102,6 +102,28 @@ export function getJob(id: string): Promise<Job> {
   return request<Job>(`/api/v1/jobs/${id}`);
 }
 
+/** Delete an image and every record derived from it (204, no body). */
+export async function deleteJob(id: string): Promise<void> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/api/v1/jobs/${id}`, {
+      method: "DELETE",
+      signal: controller.signal,
+    });
+  } catch (e) {
+    throw new Error(
+      (e as Error).name === "AbortError"
+        ? "Deleting took too long. Please try again."
+        : UNREACHABLE
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!res.ok) throw new Error(await friendlyError(res));
+}
+
 export function getAuditTrail(id: string): Promise<AuditEvent[]> {
   return request<AuditEvent[]>(`/api/v1/jobs/${id}/audit`);
 }

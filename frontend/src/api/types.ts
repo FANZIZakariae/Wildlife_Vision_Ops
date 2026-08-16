@@ -63,6 +63,9 @@ export interface AuditEvent {
 
 export interface ModelInfo {
   key: string;
+  /** Human-facing name, e.g. "YOLO11n (real model)". */
+  label: string;
+  description: string;
   provider: string;
   model: string;
   version: string;
