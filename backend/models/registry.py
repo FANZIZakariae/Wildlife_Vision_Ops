@@ -1,3 +1,4 @@
+import logging
 import threading
 from dataclasses import dataclass
 from functools import lru_cache
@@ -89,3 +90,26 @@ def get_adapter(key: str) -> VisionModel:
     get_model_config(key)  # raises KeyError/ValueError for bad keys
     with _adapter_lock:
         return _build_adapter(key)
+
+
+def warm_adapters() -> list[str]:
+    """Build (and warm up) every enabled adapter once, at process start.
+
+    Weights are then already in memory and fused, so no request ever pays the
+    model-loading cost and no two requests race to load the same weights.
+    """
+    warmed = []
+    for cfg in list_model_configs():
+        if not cfg.enabled:
+            continue
+        try:
+            adapter = get_adapter(cfg.key)
+            warmup = getattr(adapter, "warmup", None)
+            if callable(warmup):
+                warmup()
+            warmed.append(cfg.key)
+        except Exception:  # pragma: no cover - a bad adapter must not block boot
+            logging.getLogger("wildlife_vision_ops.registry").exception(
+                "Failed to warm adapter %s", cfg.key
+            )
+    return warmed
