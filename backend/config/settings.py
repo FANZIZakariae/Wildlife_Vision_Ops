@@ -18,7 +18,14 @@ class Settings(BaseSettings):
     auto_accept_threshold: float = 0.80
     review_threshold: float = 0.40
 
+    # Generous relative to the 5-10s CPU inference budget: only catches jobs
+    # orphaned by a crashed/restarted worker.
+    stale_job_timeout_s: int = 300
+    # Load model weights at process start instead of on the first request.
+    warm_models_on_startup: bool = True
+
     cors_origins: list[str] = ["*"]
+
 
 
 settings = Settings()
