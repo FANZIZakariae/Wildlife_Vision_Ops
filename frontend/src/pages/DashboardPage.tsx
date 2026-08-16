@@ -124,7 +124,8 @@ export default function DashboardPage() {
         )}
       </div>
 
-        <Card>
+      <Card>
+
         <CardTitle hint="Every completed detection across all uploaded images, retries counted once.">
           Detected class distribution
         </CardTitle>
