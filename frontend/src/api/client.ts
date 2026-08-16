@@ -106,20 +106,38 @@ export function getJob(id: string): Promise<Job> {
 
 /** Delete an image and every record derived from it (204, no body). */
 export async function deleteJob(id: string): Promise<void> {
+  try {
+    await sendDeleteRequest(`/api/v1/jobs/${id}`, "DELETE");
+  } catch (error) {
+    // Some reverse proxies reject DELETE's OPTIONS preflight. A bodyless POST
+    // is a simple CORS request and reaches the equivalent backend action.
+    if (error instanceof TypeError) {
+      try {
+        await sendDeleteRequest(`/api/v1/jobs/${id}/delete`, "POST");
+        return;
+      } catch (fallbackError) {
+        if (fallbackError instanceof TypeError) throw new Error(UNREACHABLE);
+        throw fallbackError;
+      }
+    }
+    throw error;
+  }
+}
+
+async function sendDeleteRequest(path: string, method: "DELETE" | "POST"): Promise<void> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}/api/v1/jobs/${id}`, {
-      method: "DELETE",
+    res = await fetch(`${API_BASE}${path}`, {
+      method,
       signal: controller.signal,
     });
   } catch (e) {
-    throw new Error(
-      (e as Error).name === "AbortError"
-        ? "Deleting took too long. Please try again."
-        : UNREACHABLE
-    );
+    if ((e as Error).name === "AbortError") {
+      throw new Error("Deleting took too long. Please try again.");
+    }
+    throw e;
   } finally {
     clearTimeout(timer);
   }
