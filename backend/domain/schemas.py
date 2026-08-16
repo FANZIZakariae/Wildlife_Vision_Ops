@@ -1,7 +1,7 @@
-from datetime import datetime
-from typing import Any
+from datetime import UTC, datetime
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
 from backend.domain.enums import (
     AuditEventType,
@@ -9,6 +9,21 @@ from backend.domain.enums import (
     JobStatus,
     ReviewDecision,
 )
+
+
+def _ensure_utc(value: datetime) -> datetime:
+    """Timestamps are persisted in UTC; naive DB values are tagged as UTC.
+
+    Guarantees every datetime leaving the API is timezone-aware ISO-8601, so
+    the browser can convert it to the local timezone without guessing.
+    """
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
+UtcDatetime = Annotated[datetime, AfterValidator(_ensure_utc)]
+
 
 
 class BoundingBox(BaseModel):
