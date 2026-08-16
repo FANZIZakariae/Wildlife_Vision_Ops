@@ -13,6 +13,15 @@ const EVENT_LABELS: Record<string, string> = {
   result_exported: "Final result stored",
 };
 
+const EVENT_COLOR: Record<string, string> = {
+  inference_failed: "bg-danger",
+  prediction_rejected: "bg-danger",
+  review_required: "bg-warn",
+  prediction_corrected: "bg-warn",
+  prediction_approved: "bg-success",
+  inference_completed: "bg-success",
+};
+
 function formatTime(ts: string): string {
   return new Date(ts).toLocaleTimeString([], {
     hour: "2-digit",
@@ -23,30 +32,40 @@ function formatTime(ts: string): string {
 
 export default function AuditTimeline({ events }: { events: AuditEvent[] }) {
   if (events.length === 0) {
-    return <p className="text-sm text-slate-500">No audit events yet.</p>;
+    return <p className="text-sm text-muted-foreground">No audit events yet.</p>;
   }
 
   return (
-    <ol className="space-y-2">
+    <ol className="relative space-y-4 border-l border-border pl-5">
       {events.map((e) => (
-        <li key={e.id} className="flex gap-3 text-sm">
-          <span className="w-20 shrink-0 font-mono text-xs text-slate-400">
-            {formatTime(e.timestamp)}
-          </span>
-          <div>
-            <span className="font-medium">
+        <li key={e.id} className="relative">
+          <span
+            className={`absolute -left-[26px] top-1.5 h-2.5 w-2.5 rounded-full ring-4 ring-surface ${
+              EVENT_COLOR[e.event_type] ?? "bg-primary"
+            }`}
+          />
+          <div className="flex flex-wrap items-baseline gap-x-3">
+            <span className="text-sm font-medium">
               {EVENT_LABELS[e.event_type] ?? e.event_type}
             </span>
-            <span className="ml-2 text-xs text-slate-500">{e.actor}</span>
-            {Object.keys(e.metadata).length > 0 && (
-              <div className="mt-0.5 text-xs text-slate-400">
-                {Object.entries(e.metadata)
-                  .filter(([, v]) => v !== null && v !== "")
-                  .map(([k, v]) => `${k}: ${v}`)
-                  .join(" · ")}
-              </div>
-            )}
+            <span className="font-mono text-[11px] text-subtle-foreground">
+              {formatTime(e.timestamp)} · {e.actor}
+            </span>
           </div>
+          {Object.keys(e.metadata).length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {Object.entries(e.metadata)
+                .filter(([, v]) => v !== null && v !== "")
+                .map(([k, v]) => (
+                  <span
+                    key={k}
+                    className="rounded border border-border bg-surface-elevated px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                  >
+                    {k}: {String(v)}
+                  </span>
+                ))}
+            </div>
+          )}
         </li>
       ))}
     </ol>
