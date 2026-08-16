@@ -52,9 +52,13 @@ export default function AuditTimeline({ events }: { events: AuditEvent[] }) {
             <span className="text-sm font-medium">
               {EVENT_LABELS[e.event_type] ?? e.event_type}
             </span>
-            <span className="font-mono text-[11px] text-subtle-foreground">
+            <span
+              className="font-mono text-[11px] text-subtle-foreground"
+              title={absoluteTime(e.timestamp)}
+            >
               {formatTime(e.timestamp)} · {e.actor}
             </span>
+
           </div>
           {Object.keys(e.metadata).length > 0 && (
             <div className="mt-1 flex flex-wrap gap-1.5">
